@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AbuToys - Best Toys for Happy Kids</title>
+    <meta name="description"
+        content="AbuToys Ahmedabad - Best Toys for Happy Kids | Serving Happiness in Ahmedabad since 2024 | Affordable, Safe & Non-Toxic Toys">
+    <meta name="keywords"
+        content="Toys in Ahmedabad, Buy Toys Ahmedabad, Teddy Bear Ahmedabad, Kids Toys Shop Ahmedabad, AbuToys">
+    <meta name="author" content="AbuToys Ahmedabad">
+    <link rel="stylesheet" href="toyhome.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fredoka+One:wght@400&family=Poppins:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <script>
+        // Security: Disable right click and inspect
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('keydown', function (e) {
+            // Disable F12, Ctrl+Shift+I, Ctrl+Shift+C, Ctrl+U, Ctrl+S
+            if (e.keyCode === 123 ||
+                (e.ctrlKey && e.shiftKey && e.keyCode === 73) ||
+                (e.ctrlKey && e.shiftKey && e.keyCode === 67) ||
+                (e.ctrlKey && e.keyCode === 85) ||
+                (e.ctrlKey && e.keyCode === 83)) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    </script>
+
+    <!-- =================== FIREBASE (Auth + Firestore) =================== -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+        import {
+            getAuth, GoogleAuthProvider, signInWithPopup,
+            createUserWithEmailAndPassword, signInWithEmailAndPassword,
+            onAuthStateChanged, signOut, updateProfile,
+            sendPasswordResetEmail, RecaptchaVerifier, signInWithPhoneNumber,
+            deleteUser
+        } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+        import {
+            getFirestore, doc, setDoc, getDoc, deleteDoc, serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCKwD3S45lYqwJUEAlNeyDqXg8_NXyEq10",
+            authDomain: "abutoys-8f045.firebaseapp.com",
+            projectId: "abutoys-8f045",
+            storageBucket: "abutoys-8f045.firebasestorage.app",
+            messagingSenderId: "264670786978",
+            appId: "1:264670786978:web:bd815b3586ef8008442efb",
+            measurementId: "G-C9C1BCPKS5"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let confirmationResult = null;
+
+        async function saveProfile(uid, data) {
+            await setDoc(doc(db, "users", uid), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+        }
+
+        async function getProfile(uid) {
+            const snap = await getDoc(doc(db, "users", uid));
+            return snap.exists() ? snap.data() : null;
+        }
+
+        // Expose a simple API for the classic (non-module) toyhome.js script to use
+        window.AbuFirebase = {
+            ready: true,
+
+            onAuthChange(cb) {
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        const profile = await getProfile(user.uid).catch(() => null);
+                        cb(user, profile);
+                    } else {
+                        cb(null, null);
+                    }
+                });
+            },
+
+            async register({ fullName, email, password, phone, address }) {
+                const cred = await createUserWithEmailAndPassword(auth, email, password);
+                await updateProfile(cred.user, { displayName: fullName });
+                await saveProfile(cred.user.uid, { fullName, email, phone, address, provider: "password" });
+                return cred.user;
+            },
+
+            async login(email, password) {
+                const cred = await signInWithEmailAndPassword(auth, email, password);
+                return cred.user;
+            },
+
+            async loginWithGoogle() {
+                const provider = new GoogleAuthProvider();
+                const cred = await signInWithPopup(auth, provider);
+                const existing = await getProfile(cred.user.uid);
+                if (!existing) {
+                    await saveProfile(cred.user.uid, {
+                        fullName: cred.user.displayName || "AbuToys Customer",
+                        email: cred.user.email || "",
+                        phone: cred.user.phoneNumber || "",
+                        address: "",
+                        provider: "google"
+                    });
+                }
+                return cred.user;
+            },
+
+            async sendOtp(phoneNumberWithCode) {
+                if (!window._recaptchaVerifier) {
+                    window._recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
+                }
+                confirmationResult = await signInWithPhoneNumber(auth, phoneNumberWithCode, window._recaptchaVerifier);
+                return true;
+            },
+
+            async verifyOtp(code) {
+                if (!confirmationResult) throw new Error("Pehle OTP bhejo.");
+                const cred = await confirmationResult.confirm(code);
+                const existing = await getProfile(cred.user.uid);
+                if (!existing) {
+                    await saveProfile(cred.user.uid, {
+                        fullName: "AbuToys Customer",
+                        email: "",
+                        phone: cred.user.phoneNumber || "",
+                        address: "",
+                        provider: "phone"
+                    });
+                }
+                return cred.user;
+            },
+
+            async resetPassword(email) {
+                await sendPasswordResetEmail(auth, email);
+            },
+
+            async logout() {
+                await signOut(auth);
+            },
+
+            async deleteAccount() {
+                const user = auth.currentUser;
+                if (!user) throw new Error("Login nahi hai.");
+                await deleteDoc(doc(db, "users", user.uid)).catch(() => {});
+                await deleteUser(user);
+            },
+
+            getCurrentUser() {
+                return auth.currentUser;
+            },
+
+            // Re-fetch the Firestore profile doc for the signed-in user. Used right after
+            // register()/verifyOtp() so the UI shows the real name instead of the
+            // "AbuToys Customer" fallback while Firestore is still catching up.
+            async refreshCurrentUser() {
+                const user = auth.currentUser;
+                if (!user) return null;
+                const profile = await getProfile(user.uid).catch(() => null);
+                return { user, profile };
+            },
+
+            // Update the user's profile fields. If the account uses email/password (or phone),
+            // the person can edit their name/email/phone/address. Google accounts keep their
+            // name & email locked to the Google identity, but can still edit phone/address.
+            async updateProfileData(updates) {
+                const user = auth.currentUser;
+                if (!user) throw new Error("Login nahi hai.");
+                const isGoogle = user.providerData.some(p => p.providerId === "google.com");
+
+                const toSave = { ...updates };
+                if (isGoogle) {
+                    // Never let Google-linked accounts change name/email from here.
+                    delete toSave.fullName;
+                    delete toSave.email;
+                } else if (toSave.fullName) {
+                    await updateProfile(user, { displayName: toSave.fullName }).catch(() => {});
+                }
+
+                await saveProfile(user.uid, toSave);
+                const profile = await getProfile(user.uid);
+                return { user, profile };
+            }
+        };
+
+        window.dispatchEvent(new Event("abufirebase-ready"));
+    </script>
+</head>
+
+<body>
+<!-- Page Load Loader -->
+<div id="abutoys-page-loader" class="abutoys-loader-container">
+    <div class="loader-content">
+        <div class="teddy-container">
+            <div class="teddy-emoji"><i class='fa-solid fa-shapes'></i></div>
+        </div>
+        <div class="abutoys-text">
+            <span class="text-char">A</span>
+            <span class="text-char">b</span>
+            <span class="text-char">u</span>
+            <span class="text-char">T</span>
+            <span class="text-char">o</span>
+            <span class="text-char">y</span>
+            <span class="text-char">s</span>
+        </div>
+    </div>
+</div>
+
+
+    <!-- Navbar -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2><i class='fa-solid fa-shapes'></i> AbuToys</h2>
+            </div>
+            <ul class="nav-menu" id="nav-menu">
+                <li><a href="index.html" class="nav-link active">Home</a></li>
+                <li><a href="toyproduct.html" class="nav-link">Products</a></li>
+                <li><a href="toyabout.html" class="nav-link">About</a></li>
+                <li><a href="toycontact.html" class="nav-link">Contact</a></li>
+            </ul>
+            <div class="nav-icons">
+                <div class="icon-group">
+                    <button type="button" id="profileTrigger" class="profile-trigger" title="Your Account">
+                        <span id="profileAvatarWrap" class="profile-avatar-wrap">
+                            <img id="profileAvatarImg" class="profile-avatar-img" src="" alt="Profile" style="display:none;">
+                            <span id="profileAvatarInitial" class="profile-avatar-initial"><i class="fa-solid fa-user"></i></span>
+                        </span>
+                    </button>
+                </div>
+            </div>
+            <div class="hamburger" id="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+        <!-- User Name Display -->
+        <div id="userNameDisplay" class="user-name-display"></div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero" id="home">
+        <div class="hero-content">
+            <h1 class="hero-title animate-fade-in">Best Toys for Happy Kids</h1>
+            <p class="hero-subtitle animate-fade-in-delay">Serving Happiness in Ahmedabad since 2024</p>
+            <div class="hero-buttons animate-fade-in-delay-2">
+                <a href="toyproduct.html" class="btn btn-primary"><i class='fa-solid fa-bag-shopping'></i> Explore Products</a>
+            </div>
+        </div>
+        <div class="hero-slider">
+            <div class="slide active">
+                <img src="https://img.freepik.com/free-photo/children-playing-grass_1098-504.jpg?semt=ais_hybrid&w=740&q=80"
+                    alt="Happy Kids Playing">
+            </div>
+            <div class="slide">
+                <img src="https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=800&h=600&fit=crop"
+                    alt="Colorful Toys">
+            </div>
+            <div class="slide">
+                <img src="https://images.unsplash.com/photo-1545558014-8692077e9b5c?w=800&h=600&fit=crop"
+                    alt="Kids with Toys">
+            </div>
+        </div>
+        <div class="hero-overlay"></div>
+    </section>
+
+    <!-- Why Choose Us -->
+    <section class="why-choose-us">
+        <div class="container">
+            <h2 class="section-title"><i class='fa-solid fa-trophy'></i> Why Choose AbuToys?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon"><i class='fa-solid fa-shield-halved'></i></div>
+                    <h3>Safe & Non-Toxic</h3>
+                    <p>All toys are tested for safety and made with child-safe materials</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class='fa-solid fa-tags'></i></div>
+                    <h3>Affordable Prices</h3>
+                    <p>Best quality toys at unbeatable prices for every family</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class='fa-solid fa-star'></i></div>
+                    <h3>Trusted by Parents</h3>
+                    <p>Over 1000+ happy families in Ahmedabad trust us</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class='fa-solid fa-truck-fast'></i></div>
+                    <h3>Fast Delivery</h3>
+                    <p>Quick delivery across Ahmedabad city within 2 days</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Customer Testimonials -->
+<section class="testimonials">
+    <div class="container">
+        <h2 class="section-title"><i class='fa-solid fa-comments'></i> What Parents Say</h2>
+        <div class="testimonials-grid">
+            <div class="testimonial-card scroll-animate">
+                <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                <p>"My kid absolutely loves the Teddy Bear! Amazing quality and so soft. Will definitely order again!"</p>
+                <div class="customer-info">
+                    <strong>- Mubassir Saiyad</strong>
+                </div>
+            </div>
+            <div class="testimonial-card scroll-animate">
+                <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                <p>"Great quality toys at the best prices. Fast delivery and excellent customer service. Highly recommended!"</p>
+                <div class="customer-info">
+                    <strong>- Sofiya Saiyad</strong>
+                </div>
+            </div>
+            <div class="testimonial-card scroll-animate">
+                <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                <p>"Been ordering from AbuToys for 2 years now. Always fresh stock and kids love every toy!"</p>
+                <div class="customer-info">
+                    <strong>- Ajaz Munsuri</strong>
+                </div>
+            </div>
+            <div class="testimonial-card scroll-animate">
+                <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                <p>"Best toy store in Ahmedabad! Safe products, affordable prices, and super friendly staff. My children are so happy!"</p>
+                <div class="customer-info">
+                    <strong>- Riya Patel</strong>
+                </div>
+            </div>
+            <div class="testimonial-card scroll-animate">
+                <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                <p>"Ordered toys for my daughter's birthday party. Delivery was lightning fast and all items were perfectly packed!"</p>
+                <div class="customer-info">
+                    <strong>- Karan Shah</strong>
+                </div>
+            </div>
+            <div class="testimonial-card scroll-animate">
+                <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                <p>"Amazing collection of educational toys! My son learned so much while playing. Thank you AbuToys team!"</p>
+                <div class="customer-info">
+                    <strong>- Neha Sharma</strong>
+                </div>
+            </div>
+            <div class="testimonial-card scroll-animate">
+                <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                <p>"Very impressed with the quality! Non-toxic materials and safe for kids. Worth every rupee!"</p>
+                <div class="customer-info">
+                    <strong>- Priya Desai</strong>
+                </div>
+            </div>
+            <div class="testimonial-card scroll-animate">
+                <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                <p>"Bought toys in bulk for our school event. Great discounts and excellent service. Highly professional!"</p>
+                <div class="customer-info">
+                    <strong>- Amit Mehta</strong>
+                </div>
+            </div>
+            <div class="testimonial-card scroll-animate">
+                <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                <p>"My go-to store for all baby toys! Trusted quality and amazing customer support. Keep it up!"</p>
+                <div class="customer-info">
+                    <strong>- Anjali Singh</strong>
+                </div>
+            </div>
+        </div>
+        
+        <!-- View More Button -->
+        <div class="view-more-container">
+            <button id="viewMoreTestimonials" class="btn btn-primary view-more-btn">
+                <i class='fa-solid fa-list-check'></i> View All Reviews (30+)
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- Testimonials Panel (Full Screen Sliding) -->
+<div id="testimonialsPanel" class="testimonials-panel">
+    <div class="panel-overlay"></div>
+    <div class="panel-content">
+        <div class="panel-header">
+            <h2><i class='fa-solid fa-comments'></i> Customer Reviews</h2>
+            <button id="closePanelBtn" class="close-panel-btn"><i class='fa-solid fa-xmark'></i></button>
+        </div>
+        <div class="panel-body">
+            <!-- Review 1 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">2 days ago</span>
+                </div>
+                <p class="review-text">"My kid absolutely loves the Teddy Bear! Amazing quality and so soft. Will definitely order again!"</p>
+                <div class="reviewer-name">- Mubassir Saiyad</div>
+            </div>
+
+            <!-- Review 2 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">5 days ago</span>
+                </div>
+                <p class="review-text">"Great quality toys at the best prices. Fast delivery and excellent customer service. Highly recommended!"</p>
+                <div class="reviewer-name">- Sofiya Saiyad</div>
+            </div>
+
+            <!-- Review 3 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">1 week ago</span>
+                </div>
+                <p class="review-text">"Been ordering from AbuToys for 2 years now. Always fresh stock and kids love every toy!"</p>
+                <div class="reviewer-name">- Ajaz Munsuri</div>
+            </div>
+
+            <!-- Review 4 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">1 week ago</span>
+                </div>
+                <p class="review-text">"Best toy store in Ahmedabad! Safe products, affordable prices, and super friendly staff. My children are so happy!"</p>
+                <div class="reviewer-name">- Riya Patel</div>
+            </div>
+
+            <!-- Review 5 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">2 weeks ago</span>
+                </div>
+                <p class="review-text">"Ordered toys for my daughter's birthday party. Delivery was lightning fast and all items were perfectly packed!"</p>
+                <div class="reviewer-name">- Karan Shah</div>
+            </div>
+
+            <!-- Review 6 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">2 weeks ago</span>
+                </div>
+                <p class="review-text">"Amazing collection of educational toys! My son learned so much while playing. Thank you AbuToys team!"</p>
+                <div class="reviewer-name">- Neha Sharma</div>
+            </div>
+
+            <!-- Review 7 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">3 weeks ago</span>
+                </div>
+                <p class="review-text">"Very impressed with the quality! Non-toxic materials and safe for kids. Worth every rupee!"</p>
+                <div class="reviewer-name">- Priya Desai</div>
+            </div>
+
+            <!-- Review 8 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">3 weeks ago</span>
+                </div>
+                <p class="review-text">"Bought toys in bulk for our school event. Great discounts and excellent service. Highly professional!"</p>
+                <div class="reviewer-name">- Amit Mehta</div>
+            </div>
+
+            <!-- Review 9 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">1 month ago</span>
+                </div>
+                <p class="review-text">"My go-to store for all baby toys! Trusted quality and amazing customer support. Keep it up!"</p>
+                <div class="reviewer-name">- Anjali Singh</div>
+            </div>
+
+            <!-- Review 10 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">1 month ago</span>
+                </div>
+                <p class="review-text">"Wonderful experience! Got a beautiful remote control car for my nephew. He plays with it every day!"</p>
+                <div class="reviewer-name">- Rohan Joshi</div>
+            </div>
+
+            <!-- Review 11 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">1 month ago</span>
+                </div>
+                <p class="review-text">"Perfect gifts for kids! I ordered multiple items and everything arrived on time. Excellent packaging!"</p>
+                <div class="reviewer-name">- Meera Kapoor</div>
+            </div>
+
+            <!-- Review 12 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">1 month ago</span>
+                </div>
+                <p class="review-text">"My daughter loves her new doll set! Great quality and very affordable. Thank you AbuToys!"</p>
+                <div class="reviewer-name">- Sanjay Verma</div>
+            </div>
+
+            <!-- Review 13 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">2 months ago</span>
+                </div>
+                <p class="review-text">"Ordered building blocks for my son. He's learning and having fun at the same time. Highly recommend!"</p>
+                <div class="reviewer-name">- Pooja Gupta</div>
+            </div>
+
+            <!-- Review 14 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">2 months ago</span>
+                </div>
+                <p class="review-text">"Best customer service! They helped me choose the right toys for different age groups. Very knowledgeable team!"</p>
+                <div class="reviewer-name">- Vikram Patel</div>
+            </div>
+
+            <!-- Review 15 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">2 months ago</span>
+                </div>
+                <p class="review-text">"Got amazing deals during Diwali sale! Quality products at unbeatable prices. Will shop again!"</p>
+                <div class="reviewer-name">- Divya Shah</div>
+            </div>
+
+            <!-- Review 16 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">2 months ago</span>
+                </div>
+                <p class="review-text">"My kids play with these toys every day! Durable, safe, and fun. Best purchase ever!"</p>
+                <div class="reviewer-name">- Rahul Desai</div>
+            </div>
+
+            <!-- Review 17 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">3 months ago</span>
+                </div>
+                <p class="review-text">"Fantastic variety of toys! From puzzles to action figures, they have everything. One-stop shop!"</p>
+                <div class="reviewer-name">- Kavita Jain</div>
+            </div>
+
+            <!-- Review 18 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">3 months ago</span>
+                </div>
+                <p class="review-text">"Delivery was super fast! Ordered on Monday, received on Wednesday. Very satisfied with the service!"</p>
+                <div class="reviewer-name">- Arjun Modi</div>
+            </div>
+
+            <!-- Review 19 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">3 months ago</span>
+                </div>
+                <p class="review-text">"My son's birthday was made special thanks to AbuToys! Beautiful toy cars and great packaging!"</p>
+                <div class="reviewer-name">- Sneha Rao</div>
+            </div>
+
+            <!-- Review 20 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">3 months ago</span>
+                </div>
+                <p class="review-text">"Eco-friendly toys that are safe for babies. I'm so happy I found this store!"</p>
+                <div class="reviewer-name">- Manish Kumar</div>
+            </div>
+
+            <!-- Review 21 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">4 months ago</span>
+                </div>
+                <p class="review-text">"Great experience shopping here! The team was helpful and the toys are top quality!"</p>
+                <div class="reviewer-name">- Ishita Bansal</div>
+            </div>
+
+            <!-- Review 22 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">4 months ago</span>
+                </div>
+                <p class="review-text">"My niece loves the kitchen set! Very realistic and great for pretend play. Highly recommend!"</p>
+                <div class="reviewer-name">- Vishal Agarwal</div>
+            </div>
+
+            <!-- Review 23 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">4 months ago</span>
+                </div>
+                <p class="review-text">"Perfect toys for developing motor skills! My baby is learning so much. Thank you!"</p>
+                <div class="reviewer-name">- Nisha Reddy</div>
+            </div>
+
+            <!-- Review 24 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">5 months ago</span>
+                </div>
+                <p class="review-text">"Got musical toys for my daughter. She's so happy and plays beautiful tunes every day!"</p>
+                <div class="reviewer-name">- Deepak Malhotra</div>
+            </div>
+
+            <!-- Review 25 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">5 months ago</span>
+                </div>
+                <p class="review-text">"Amazing store with friendly staff! They helped me find the perfect gift for my nephew!"</p>
+                <div class="reviewer-name">- Aarti Chopra</div>
+            </div>
+
+            <!-- Review 26 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">5 months ago</span>
+                </div>
+                <p class="review-text">"Durable and long-lasting toys! My kids have been playing with them for months now!"</p>
+                <div class="reviewer-name">- Suresh Iyer</div>
+            </div>
+
+            <!-- Review 27 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">6 months ago</span>
+                </div>
+                <p class="review-text">"Best prices in Ahmedabad! I compared with other stores and AbuToys is the most affordable!"</p>
+                <div class="reviewer-name">- Lalita Nair</div>
+            </div>
+
+            <!-- Review 28 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">6 months ago</span>
+                </div>
+                <p class="review-text">"My daughter's toy collection is all from AbuToys! Trusted and reliable every single time!"</p>
+                <div class="reviewer-name">- Rajesh Bhatt</div>
+            </div>
+
+            <!-- Review 29 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">6 months ago</span>
+                </div>
+                <p class="review-text">"Educational and fun! My son is learning colors and shapes with these amazing toys!"</p>
+                <div class="reviewer-name">- Geeta Pandey</div>
+            </div>
+
+            <!-- Review 30 -->
+            <div class="panel-review">
+                <div class="review-header">
+                    <div class="stars"><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i><i class='fa-solid fa-star'></i></div>
+                    <span class="review-date">7 months ago</span>
+                </div>
+                <p class="review-text">"Simply the best! Quality, price, service - everything is perfect. Love AbuToys! <i class='fa-solid fa-heart'></i>"</p>
+                <div class="reviewer-name">- Harish Tiwari</div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+    <!-- About Shop -->
+    <section class="about-mini" id="about">
+        <div class="container">
+            <div class="about-content">
+                <div class="about-text">
+                    <h2 class="section-title"><i class='fa-solid fa-shapes'></i> About AbuToys</h2>
+                    <p>Since 2024, we have been spreading happiness through toys in the beautiful city of Ahmedabad.
+                        What started as a small family business has now become the most trusted toy store in the city.
+                    </p>
+                    <div class="about-points">
+                        <div class="point">
+                            <i class="fas fa-check-circle"></i>
+                            <span>1+ Years of Experience</span>
+                        </div>
+                        <div class="point">
+                            <i class="fas fa-check-circle"></i>
+                            <span>100% Authentic Products</span>
+                        </div>
+                        <div class="point">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Proudly Serving Ahmedabad</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="about-image">
+                    <img src="https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=400&fit=crop"
+                        alt="Toy Store">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Special Offers Section -->
+<section class="special-offers">
+    <div class="container">
+        <div class="offers-content">
+            <h2><i class='fa-solid fa-gift'></i> Special Offers & Deals</h2>
+            <p>Don't miss out on our amazing discounts and festive offers!</p>
+            <div class="offers-grid">
+                <div class="offer-card">
+                    <div class="offer-icon"><i class='fa-solid fa-champagne-glasses'></i></div>
+                    <h3>Festival Special</h3>
+                    <p>Get exclusive combo deals during festivals - Diwali, Holi, Christmas & more! Free gift wrapping included.</p>
+                </div>
+                <div class="offer-card bulk-order-card">
+                    <div class="offer-icon"><i class='fa-solid fa-boxes-stacked'></i></div>
+                    <h3>Bulk Orders</h3>
+                    <p>Planning birthday parties, school events, or corporate gifts? Get special wholesale rates on bulk purchases!</p>
+                    <div class="bulk-buttons">
+                        <a href="https://wa.me/8160154042?text=Hi%20AbuToys%2C%20I%20need%20bulk%20products%20and%20want%20to%20discuss%20wholesale%20rates%20with%20you." 
+                           target="_blank" class="bulk-btn whatsapp-bulk">
+                            <i class="fab fa-whatsapp"></i> WhatsApp
+                        </a>
+                        <a href="tel:+917069331761" class="bulk-btn call-bulk">
+                            <i class="fas fa-phone"></i> Call Now
+                        </a>
+                    </div>
+                </div>
+                <div class="offer-card">
+                    <div class="offer-icon"><i class='fa-solid fa-cake-candles'></i></div>
+                    <h3>Birthday Package</h3>
+                    <p>Special combo deals for birthday gifts with personalized cards and same-day delivery available!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+    <!-- Store Information -->
+    <section class="store-info" id="contact">
+        <div class="container">
+            <h2 class="section-title"><i class='fa-solid fa-store'></i> Store Information</h2>
+            <div class="store-grid">
+                <div class="store-details">
+                    <div class="store-card">
+                        <div class="store-icon"><i class='fa-solid fa-location-dot'></i></div>
+                        <h3>Our Location</h3>
+                        <p>Abu Wala Toys, Ahmedabad<br>Gujarat, India</p>
+                    </div>
+                    <div class="store-card">
+                        <div class="store-icon"><i class='fa-solid fa-clock'></i></div>
+                        <h3>Opening Hours</h3>
+                        <p>24*7<br>Always ready to serve you!</p>
+                    </div>
+                    <div class="store-card">
+                        <div class="store-icon"><i class='fa-solid fa-truck-fast'></i></div>
+                        <h3>Delivery Areas</h3>
+                        <p>All areas within Ahmedabad under the range of 10km.<br>Fast & reliable delivery</p>
+                    </div>
+                </div>
+                <div class="store-map">
+                    <iframe
+                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d917.4959341168718!2d72.5820909!3d23.0370158!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x395e85003cc4458d%3A0x18176afb34712d04!2sAbu%20Wala%20Toys!5e1!3m2!1sen!2sin!4v1736866889123!5m2!1sen!2sin"
+                        width="100%" height="840" style="border:0;" allowfullscreen="" loading="lazy"
+                        referrerpolicy="no-referrer-when-downgrade"></iframe>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3><i class='fa-solid fa-shapes'></i> AbuToys</h3>
+                    <p>Making childhood magical since 2024</p>
+                    <div class="social-icons">
+                        <a href="https://wa.me/8160154042" target="_blank"><i class="fab fa-whatsapp"></i></a>
+                        <a href="https://www.instagram.com/abutoys_official" target="_blank"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="toyproduct.html">Products</a></li>
+                        <li><a href="toyabout.html">About Us</a></li>
+                        <li><a href="toycontact.html">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contact Info</h4>
+                    <div class="contact-info">
+                        <p><i class="fas fa-phone"></i> +91 9879254030</p>
+                        <p><i class="fas fa-envelope"></i> AbuToys9879@gmail.com</p>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 AbuToys - All Rights Reserved | Made with <i class='fa-solid fa-heart'></i> for Happy Kids</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Account Modal -->
+    <div id="accountModal" class="modal">
+        <span class="close" id="closeAccountModalX">&times;</span>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class='fa-solid fa-shapes'></i> Welcome to AbuToys</h2>
+                <p>Join our happy family!</p>
+            </div>
+            <div class="modal-tabs">
+                <button class="tab-button" id="tabBtnLogin" onclick="showTab('login')">Login</button>
+                <button class="tab-button active" id="tabBtnSignup" onclick="showTab('signup')">Sign Up</button>
+            </div>
+
+            <!-- LOGIN TAB -->
+            <div id="loginTab" class="tab-content">
+                <form id="loginForm">
+                    <input type="email" id="loginEmail" name="loginEmail" placeholder="Email Address" required>
+
+                    <div style="position:relative;">
+                        <input type="password" id="loginPassword" name="loginPassword" placeholder="Password" required
+                            style="width:100%; padding-right:40px;">
+                        <i class="fa fa-eye toggle-password" data-target="loginPassword"
+                            style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer;"></i>
+                    </div>
+
+                    <div class="auth-links-row">
+                        <a href="#" id="forgotPasswordLink">Forgot password?</a>
+                        <a href="#" id="switchToPhoneLogin">Login with Phone</a>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="loginSubmitBtn" style="width:100%; justify-content:center;">Login</button>
+                </form>
+
+                <!-- PHONE OTP LOGIN (hidden by default) -->
+                <div id="phoneLoginBlock" style="display:none;">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <span style="padding: 10px 12px; background:#f0f0f0; border-radius:8px;">+91</span>
+                        <input type="tel" id="loginPhone" placeholder="Phone Number (10 digits)" maxlength="10" style="flex:1;">
+                    </div>
+                    <button type="button" id="sendOtpBtn" class="btn btn-secondary" style="width:100%; justify-content:center; margin-top:8px;">Send OTP</button>
+
+                    <div id="otpInputBlock" style="display:none; margin-top:12px;">
+                        <input type="text" id="otpCode" placeholder="Enter 6-digit OTP" maxlength="6">
+                        <button type="button" id="verifyOtpBtn" class="btn btn-primary" style="width:100%; justify-content:center;">Verify OTP</button>
+                    </div>
+
+                    <div class="auth-links-row" style="justify-content:center; margin-top:10px;">
+                        <a href="#" id="switchToEmailLogin">← Login with Email instead</a>
+                    </div>
+                </div>
+
+                <div class="auth-divider"><span>OR</span></div>
+                <button type="button" id="googleLoginBtn" class="btn-google">
+                    <i class="fa-brands fa-google"></i> Continue with Google
+                </button>
+
+                <div id="recaptcha-container"></div>
+            </div>
+
+            <!-- SIGNUP TAB -->
+            <div id="signupTab" class="tab-content active">
+                <form id="signupForm">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="text" id="fullName" name="fullName" placeholder="Full Name" required
+                            style="flex:1;">
+                    </div>
+
+                    <input type="email" id="email" name="email" placeholder="Email Address" required>
+
+                    <div style="position:relative;">
+                        <input type="password" id="password" name="password" placeholder="Create Password" required
+                            style="width:100%; padding-right:40px;">
+                        <i class="fa fa-eye toggle-password" data-target="password"
+                            style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer;"></i>
+                    </div>
+
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <span style="padding: 10px 12px; background:#f0f0f0; border-radius:8px;">+91</span>
+                        <input type="tel" id="phone" name="phone" placeholder="Phone Number (10 digits)" maxlength="10"
+                            required style="flex:1;">
+                    </div>
+
+                    <input type="text" id="address" name="address" placeholder="Full Address (House/Street/Locality)"
+                        required>
+
+                    <button type="submit" class="btn btn-primary" id="signupSubmitBtn" style="width:100%; justify-content:center; margin-top:6px;">Create Account</button>
+                </form>
+
+                <div class="auth-divider"><span>OR</span></div>
+                <button type="button" id="googleSignupBtn" class="btn-google">
+                    <i class="fa-brands fa-google"></i> Continue with Google
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div id="profileModal" class="modal profile-modal">
+        <span class="close" id="closeProfileModalX">&times;</span>
+        <div class="modal-content profile-modal-content">
+            <div class="profile-header">
+                <div class="profile-header-avatar">
+                    <img id="profileModalAvatarImg" src="" alt="Profile" style="display:none;">
+                    <span id="profileModalAvatarInitial"><i class="fa-solid fa-user"></i></span>
+                </div>
+                <h2 id="profileModalName">Your Name</h2>
+                <p id="profileModalMeta">email@example.com</p>
+            </div>
+
+            <div class="profile-tabs">
+                <button class="profile-tab-btn active" id="profileTabDetailsBtn" data-tab="details">
+                    <i class="fa-solid fa-id-card"></i> Details
+                </button>
+                <button class="profile-tab-btn" id="profileTabOrdersBtn" data-tab="orders">
+                    <i class="fa-solid fa-bag-shopping"></i> Orders
+                </button>
+            </div>
+
+            <!-- DETAILS TAB -->
+            <div id="profileDetailsTab" class="profile-tab-content active">
+                <form id="profileDetailsForm">
+                    <label class="profile-field-label">Full Name</label>
+                    <input type="text" id="profileFullName" name="profileFullName" placeholder="Full Name">
+
+                    <label class="profile-field-label">Email Address</label>
+                    <input type="email" id="profileEmail" name="profileEmail" placeholder="Email Address">
+
+                    <label class="profile-field-label">Phone Number</label>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <span style="padding: 10px 12px; background:#f0f0f0; border-radius:8px;">+91</span>
+                        <input type="tel" id="profilePhone" name="profilePhone" placeholder="Phone Number" maxlength="10" style="flex:1;">
+                    </div>
+
+                    <label class="profile-field-label">Delivery Address</label>
+                    <input type="text" id="profileAddress" name="profileAddress" placeholder="Full Address (House/Street/Locality)">
+
+                    <p id="profileGoogleNote" class="profile-google-note" style="display:none;">
+                        <i class="fa-brands fa-google"></i> Signed in with Google — name & email are managed by your Google account.
+                    </p>
+
+                    <button type="submit" class="btn btn-primary" id="profileSaveBtn" style="width:100%; justify-content:center; margin-top:10px;">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Changes
+                    </button>
+                </form>
+
+                <div class="profile-danger-zone">
+                    <button type="button" id="profileLogoutBtn" class="btn btn-secondary" style="width:100%; justify-content:center;">
+                        <i class="fa-solid fa-right-from-bracket"></i> Logout
+                    </button>
+                    <button type="button" id="profileDeleteAccountBtn" class="btn-danger-outline" style="width:100%; justify-content:center;">
+                        <i class="fa-solid fa-trash"></i> Delete Account
+                    </button>
+                </div>
+            </div>
+
+            <!-- ORDERS TAB -->
+            <div id="profileOrdersTab" class="profile-tab-content">
+                <div class="orders-section-head">
+                    <h3><i class="fa-solid fa-truck-fast"></i> Active Orders</h3>
+                </div>
+                <div id="activeOrdersList" class="orders-list">
+                    <p class="orders-empty">No active orders right now.</p>
+                </div>
+
+                <div class="orders-section-head" style="margin-top:20px;">
+                    <h3><i class="fa-solid fa-clock-rotate-left"></i> Order History</h3>
+                    <button type="button" id="clearOrderHistoryBtn" class="clear-history-link">
+                        <i class="fa-solid fa-trash-can"></i> Clear
+                    </button>
+                </div>
+                <div id="orderHistoryList" class="orders-list">
+                    <p class="orders-empty">No past orders yet.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="backToTopSimple"
+        style="position: fixed; bottom: 30px; right: 20px; background: linear-gradient(45deg, #FF6B6B, #4ECDC4); color: white; width: 60px; height: 60px; border-radius: 50%; cursor: pointer; z-index: 99999; display: none; align-items: center; justify-content: center; font-size: 30px; font-weight: bolder; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: all 0.3s ease;">
+        <i class="fa-solid fa-arrow-up"></i></div>
+
+    <script src="toyhome.js"></script>
+</body>
+</html>

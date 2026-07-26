@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Us - AbuToys | Get In Touch</title>
+    <meta name="description" content="Contact AbuToys Ahmedabad - We're here to help! Call, WhatsApp or visit us. Fast response guaranteed.">
+    <meta name="keywords" content="Contact AbuToys, Toy Store Contact, Ahmedabad Toys, Customer Support">
+    <meta name="author" content="AbuToys Ahmedabad">
+    <link rel="stylesheet" href="toycontact.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One:wght@400&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        // Security: Disable right click and inspect
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('keydown', function (e) {
+            if (e.keyCode === 123 ||
+                (e.ctrlKey && e.shiftKey && e.keyCode === 73) ||
+                (e.ctrlKey && e.shiftKey && e.keyCode === 67) ||
+                (e.ctrlKey && e.keyCode === 85) ||
+                (e.ctrlKey && e.keyCode === 83)) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    </script>
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <a href="index.html" style="text-decoration: none;">
+                    <h2>🧸 AbuToys</h2>
+                </a>
+            </div>
+            <ul class="nav-menu" id="nav-menu">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="toyproduct.html" class="nav-link">Products</a></li>
+                <li><a href="toyabout.html" class="nav-link">About</a></li>
+                <li><a href="toycontact.html" class="nav-link active">Contact</a></li>
+            </ul>
+            <div class="nav-icons">
+                <div class="icon-group">
+                    <i class="fa-solid fa-broom nav-icon" title="Clear Order History" id="cartIcon"></i>
+                    <i class="fa-solid fa-trash nav-icon" title="Delete Account" id="deleteAccountIcon" style="cursor: pointer; color: #FF6B6B;"></i>
+                </div>
+            </div>
+            <div class="hamburger" id="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+        <!-- User Name Display -->
+        <div id="userNameDisplay" class="user-name-display"></div>
+    </nav>
+
+    <!-- Contact Hero Section -->
+    <section class="contact-hero">
+        <div class="container">
+            <h1 class="page-title animate-fade-in">📞 Get In Touch</h1>
+            <p class="page-subtitle animate-fade-in-delay">We're here to help you! Reach out anytime.</p>
+        </div>
+    </section>
+
+    <!-- Quick Contact Cards -->
+    <section class="quick-contact">
+        <div class="container">
+            <div class="contact-cards-grid">
+                <div class="contact-card">
+                    <div class="card-icon">📞</div>
+                    <h3>Call Us</h3>
+                    <p>Speak directly with our team</p>
+                    <a href="tel:+919879254030" class="contact-link">+91 9879254030</a>
+                </div>
+                <div class="contact-card">
+                    <div class="card-icon">💬</div>
+                    <h3>WhatsApp</h3>
+                    <p>Quick chat support available</p>
+                    <a href="https://wa.me/8160154042" target="_blank" class="contact-link">Chat Now</a>
+                </div>
+                <div class="contact-card">
+                    <div class="card-icon">✉️</div>
+                    <h3>Email Us</h3>
+                    <p>Send us your queries</p>
+                    <a href="mailto:AbuToys9879@gmail.com" class="contact-link">AbuToys9879@gmail.com</a>
+                </div>
+                <div class="contact-card">
+                    <div class="card-icon">📍</div>
+                    <h3>Visit Store</h3>
+                    <p>Abu Wala Toys, Ahmedabad</p>
+                    <a href="#store-location" class="contact-link">View Map</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Form Section -->
+    <section class="contact-form-section">
+        <div class="container">
+            <div class="form-wrapper">
+                <div class="form-left">
+                    <h2>💌 Send Us a Message</h2>
+                    <p>Have a question or special request? Fill out the form and we'll get back to you within 24 hours!</p>
+                    
+                    <div class="form-features">
+                        <div class="feature-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Fast Response Time</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Friendly Support Team</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Available 24/7</span>
+                        </div>
+                    </div>
+
+                    <div class="social-connect">
+                        <h4>Connect With Us</h4>
+                        <div class="social-buttons">
+                            <a href="https://wa.me/919879254030" target="_blank" class="social-btn whatsapp">
+                                <i class="fab fa-whatsapp"></i>
+                            </a>
+                            <a href="https://www.instagram.com/abutoys_official" target="_blank" class="social-btn instagram">
+                                <i class="fab fa-instagram"></i>
+                            </a>
+                            <a href="#" class="social-btn facebook">
+                                <i class="fab fa-facebook"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-right">
+                    <form id="contactForm">
+                        <div class="form-group">
+                            <label for="name">Your Name</label>
+                            <input type="text" id="name" name="name" placeholder="Enter your full name" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="email">Email Address</label>
+                            <input type="email" id="email" name="email" placeholder="your.email@example.com" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="phone">Phone Number</label>
+                            <div class="phone-input-wrapper">
+                                <span class="phone-prefix">+91</span>
+                                <input type="tel" id="phone" name="phone" placeholder="Phone Number" maxlength="10" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="subject">Subject</label>
+                            <select id="subject" name="subject" required>
+                                <option value="">Select a topic</option>
+                                <option value="product">Product Inquiry</option>
+                                <option value="order">Order Status</option>
+                                <option value="delivery">Delivery Question</option>
+                                <option value="complaint">Complaint/Issue</option>
+                                <option value="feedback">Feedback</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="message">Your Message</label>
+                            <textarea id="message" name="message" rows="5" placeholder="Tell us how we can help you..." required></textarea>
+                        </div>
+
+                        <button type="submit" class="submit-btn">
+                            <i class="fas fa-paper-plane"></i> Send Message
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Store Location & Hours -->
+    <section class="store-location" id="store-location">
+        <div class="container">
+            <h2 class="section-title">🏪 Visit Our Store</h2>
+            
+            <div class="location-grid">
+                <div class="location-info">
+                    <div class="info-card">
+                        <div class="info-icon">📍</div>
+                        <h3>Our Address</h3>
+                        <p>Abu Wala Toys<br>Ahmedabad, Gujarat, India</p>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="info-icon">🕒</div>
+                        <h3>Opening Hours</h3>
+                        <p>24/7<br>Always ready to serve you!</p>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="info-icon">🚚</div>
+                        <h3>Delivery Areas</h3>
+                        <p>All areas within 10km<br>Fast & reliable delivery</p>
+                    </div>
+
+                    <div class="directions-btn-wrapper">
+                        <a href="https://www.google.com/maps/place/Abu+Wala+Toys/@23.0370158,72.5820909,17z" target="_blank" class="directions-btn">
+                            <i class="fas fa-directions"></i> Get Directions
+                        </a>
+                    </div>
+                </div>
+
+                <div class="location-map">
+                    <iframe
+                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d917.4959341168718!2d72.5820909!3d23.0370158!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x395e85003cc4458d%3A0x18176afb34712d04!2sAbu%20Wala%20Toys!5e1!3m2!1sen!2sin!4v1736866889123!5m2!1sen!2sin"
+                        width="100%" 
+                        height="100%" 
+                        style="border:0;" 
+                        allowfullscreen="" 
+                        loading="lazy"
+                        referrerpolicy="no-referrer-when-downgrade">
+                    </iframe>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="faq-section">
+        <div class="container">
+            <h2 class="section-title">❓ Frequently Asked Questions</h2>
+            
+            <div class="faq-grid">
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <i class="fas fa-question-circle"></i>
+                        <h3>What are your delivery charges?</h3>
+                    </div>
+                    <p class="faq-answer">Delivery charges vary based on distance. Within 1km it's FREE! For longer distances, charges range from ₹60-₹220 up to 10km.</p>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <i class="fas fa-question-circle"></i>
+                        <h3>Do you deliver outside Ahmedabad?</h3>
+                    </div>
+                    <p class="faq-answer">Currently we only deliver within 10km radius of our store in Ahmedabad. We're working on expanding soon!</p>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <i class="fas fa-question-circle"></i>
+                        <h3>Are all toys safety tested?</h3>
+                    </div>
+                    <p class="faq-answer">Yes! Every toy we sell is tested for safety and made with non-toxic, child-safe materials. Your child's safety is our priority.</p>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <i class="fas fa-question-circle"></i>
+                        <h3>Can I return or exchange products?</h3>
+                    </div>
+                    <p class="faq-answer">Yes, we accept returns within 7 days if the product is unused and in original packaging. Contact us for exchange requests.</p>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <i class="fas fa-question-circle"></i>
+                        <h3>How long does delivery take?</h3>
+                    </div>
+                    <p class="faq-answer">We deliver within 2 days across Ahmedabad. For urgent orders, contact us on WhatsApp for same-day delivery options.</p>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <i class="fas fa-question-circle"></i>
+                        <h3>Do you offer bulk discounts?</h3>
+                    </div>
+                    <p class="faq-answer">Yes! We provide special discounts on bulk orders for birthday parties, schools, and events. WhatsApp us for custom quotes.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>🧸 AbuToys</h3>
+                    <p>Making childhood magical since 2024</p>
+                    <div class="social-icons">
+                        <a href="https://wa.me/8160154042" target="_blank"><i class="fab fa-whatsapp"></i></a>
+                        <a href="https://www.instagram.com/abutoys_official" target="_blank"><i class="fab fa-instagram"></i></a>
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="toyproduct.html">Products</a></li>
+                        <li><a href="toyabout.html">About Us</a></li>
+                        <li><a href="toycontact.html">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contact Info</h4>
+                    <div class="contact-info">
+                        <p><i class="fas fa-phone"></i> +91 9879254030</p>
+                        <p><i class="fas fa-envelope"></i> AbuToys9879@gmail.com</p>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 AbuToys - All Rights Reserved | Made with ❤️ for Happy Kids</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Back to Top Button -->
+    <div id="backToTopSimple" style="
+        position: fixed;
+        bottom: 30px;
+        right: 20px;
+        background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+        color: white;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        cursor: pointer;
+        z-index: 99999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        font-size: 30px;
+        font-weight: bolder;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        transition: all 0.3s ease;
+    ">↑</div>
+
+    <!-- WhatsApp Float Button -->
+    <div id="whatsappFloat" style="
+        position: fixed;
+        bottom: 100px;
+        right: 20px;
+        background: #25d366;
+        color: white;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 20px rgba(37, 211, 102, 0.4);
+        cursor: pointer;
+        z-index: 999;
+        font-size: 28px;
+        transition: all 0.3s ease;
+    ">
+        <i class="fab fa-whatsapp"></i>
+    </div>
+
+    <script src="toycontact.js"></script>
+</body>
+</html>
