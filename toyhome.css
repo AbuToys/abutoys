@@ -78,6 +78,25 @@
         filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.15));
     }
 
+    /* =================== ABUTOYS SMILEY BRAND ICON =================== */
+    .abutoys-smiley-icon {
+        width: 1em;
+        height: 1em;
+        vertical-align: -0.15em;
+        display: inline-block;
+    }
+
+    .abutoys-smiley-icon .smiley-eye {
+        animation: smileyBlink 2s ease-in-out infinite;
+        transform-origin: center;
+        transform-box: fill-box;
+    }
+
+    @keyframes smileyBlink {
+        0%, 92%, 100% { transform: scaleY(1); }
+        96% { transform: scaleY(0.12); }
+    }
+
     /* AbuToys Text Animation */
     @keyframes slideInUp {
         0% {
@@ -1120,6 +1139,20 @@
             bottom: 80px;
         }
 
+        .store-map iframe {
+            height: 320px !important;
+        }
+
+        .view-more-container {
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .view-more-container .view-more-btn {
+            width: 100%;
+            max-width: 320px;
+        }
+
         .modal-content {
             margin: 20% auto 10% auto;
             width: 95%;
@@ -1149,6 +1182,10 @@
 
         .hero-title {
             font-size: 2rem;
+        }
+
+        .store-map iframe {
+            height: 260px !important;
         }
 
         .gallery-grid {
@@ -1501,6 +1538,10 @@
 .view-more-container {
     text-align: center;
     margin-top: 3rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
 }
 
 .view-more-btn {
@@ -1513,6 +1554,53 @@
 .view-more-btn:hover {
     transform: translateY(-3px) scale(1.05);
     box-shadow: 0 12px 35px rgba(255, 107, 107, 0.5);
+}
+
+/* ========== GIVE REVIEW STAR WIDGET ========== */
+.give-review-stars {
+    font-size: 2rem;
+    color: #ddd;
+    display: flex;
+    gap: 10px;
+}
+
+.give-review-stars i {
+    cursor: pointer;
+    transition: color 0.2s ease, transform 0.15s ease;
+}
+
+.give-review-stars i:hover {
+    transform: scale(1.15);
+}
+
+.give-review-stars i.selected {
+    color: #FFD700;
+}
+
+/* Address auto-fill suggestion box (from saved verified location) */
+.location-suggest-box {
+    position: absolute;
+    z-index: 20001;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    color: #333;
+    cursor: pointer;
+    max-width: 320px;
+}
+
+.location-suggest-box:hover {
+    background: #f8f9fa;
+}
+
+.location-suggest-box small {
+    display: block;
+    color: #999;
+    font-size: 0.75rem;
+    margin-bottom: 4px;
 }
 
 /* ========== TESTIMONIALS PANEL (SLIDING FROM RIGHT) ========== */
@@ -1642,14 +1730,14 @@
 
 .review-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
     margin-bottom: 12px;
 }
 
 .review-date {
-    font-size: 0.85rem;
-    color: #999;
+    /* Dates are intentionally hidden on review cards now. */
+    display: none;
 }
 
 .review-text {
