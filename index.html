@@ -9,6 +9,10 @@
     <meta name="keywords"
         content="Toys in Ahmedabad, Buy Toys Ahmedabad, Teddy Bear Ahmedabad, Kids Toys Shop Ahmedabad, AbuToys">
     <meta name="author" content="AbuToys Ahmedabad">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <link rel="stylesheet" href="toyhome.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link
@@ -34,15 +38,17 @@
     <!-- =================== FIREBASE (Auth + Firestore) =================== -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-analytics.js";
         import {
             getAuth, GoogleAuthProvider, signInWithPopup,
             createUserWithEmailAndPassword, signInWithEmailAndPassword,
             onAuthStateChanged, signOut, updateProfile,
-            sendPasswordResetEmail, RecaptchaVerifier, signInWithPhoneNumber,
+            sendPasswordResetEmail, sendEmailVerification,
             deleteUser
         } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
         import {
-            getFirestore, doc, setDoc, getDoc, deleteDoc, serverTimestamp
+            getFirestore, doc, setDoc, getDoc, deleteDoc, serverTimestamp,
+            collection, addDoc, getDocs, query, orderBy, limit
         } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -58,8 +64,9 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-
-        let confirmationResult = null;
+        // Analytics measurement ID above is now actually initialized here so
+        // Firebase/Google Analytics starts tracking real visits.
+        try { getAnalytics(app); } catch (e) { console.warn("Analytics init failed:", e); }
 
         async function saveProfile(uid, data) {
             await setDoc(doc(db, "users", uid), { ...data, updatedAt: serverTimestamp() }, { merge: true });
@@ -78,9 +85,11 @@
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         const profile = await getProfile(user.uid).catch(() => null);
-                        cb(user, profile);
+                        const isGoogle = (user.providerData || []).some(p => p.providerId === "google.com");
+                        const verified = isGoogle || user.emailVerified;
+                        cb(user, profile, verified);
                     } else {
-                        cb(null, null);
+                        cb(null, null, true);
                     }
                 });
             },
@@ -89,11 +98,24 @@
                 const cred = await createUserWithEmailAndPassword(auth, email, password);
                 await updateProfile(cred.user, { displayName: fullName });
                 await saveProfile(cred.user.uid, { fullName, email, phone, address, provider: "password" });
+                // Email/password accounts must verify their email before they can use it.
+                await sendEmailVerification(cred.user).catch(() => {});
+                await signOut(auth);
                 return cred.user;
             },
 
             async login(email, password) {
                 const cred = await signInWithEmailAndPassword(auth, email, password);
+                const isGoogle = (cred.user.providerData || []).some(p => p.providerId === "google.com");
+                if (!isGoogle && !cred.user.emailVerified) {
+                    // Not verified yet: resend the link while we still have the session,
+                    // then sign out so the app never treats this as a real login.
+                    await sendEmailVerification(cred.user).catch(() => {});
+                    await signOut(auth);
+                    const err = new Error("Email verify nahi hui.");
+                    err.code = "auth/email-not-verified";
+                    throw err;
+                }
                 return cred.user;
             },
 
@@ -113,28 +135,10 @@
                 return cred.user;
             },
 
-            async sendOtp(phoneNumberWithCode) {
-                if (!window._recaptchaVerifier) {
-                    window._recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
-                }
-                confirmationResult = await signInWithPhoneNumber(auth, phoneNumberWithCode, window._recaptchaVerifier);
-                return true;
-            },
-
-            async verifyOtp(code) {
-                if (!confirmationResult) throw new Error("Pehle OTP bhejo.");
-                const cred = await confirmationResult.confirm(code);
-                const existing = await getProfile(cred.user.uid);
-                if (!existing) {
-                    await saveProfile(cred.user.uid, {
-                        fullName: "AbuToys Customer",
-                        email: "",
-                        phone: cred.user.phoneNumber || "",
-                        address: "",
-                        provider: "phone"
-                    });
-                }
-                return cred.user;
+            async resendVerificationEmail() {
+                const user = auth.currentUser;
+                if (!user) throw new Error("Login nahi hai.");
+                await sendEmailVerification(user);
             },
 
             async resetPassword(email) {
@@ -175,10 +179,11 @@
                 const isGoogle = user.providerData.some(p => p.providerId === "google.com");
 
                 const toSave = { ...updates };
+                // Email can never be changed from the profile panel, for anyone.
+                delete toSave.email;
                 if (isGoogle) {
-                    // Never let Google-linked accounts change name/email from here.
+                    // Never let Google-linked accounts change name from here either.
                     delete toSave.fullName;
-                    delete toSave.email;
                 } else if (toSave.fullName) {
                     await updateProfile(user, { displayName: toSave.fullName }).catch(() => {});
                 }
@@ -186,6 +191,37 @@
                 await saveProfile(user.uid, toSave);
                 const profile = await getProfile(user.uid);
                 return { user, profile };
+            },
+
+            // ---------------- REVIEWS (Firestore) ----------------
+            // Reviews are stored in a top-level "reviews" collection so they can be
+            // fetched and shown to every visitor. Requires this Firestore rule:
+            //   match /reviews/{reviewId} {
+            //     allow read: if true;
+            //     allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
+            //     allow update, delete: if false;
+            //   }
+            async submitReview({ name, stars, text }) {
+                const user = auth.currentUser;
+                if (!user) throw new Error("Login nahi hai.");
+                await addDoc(collection(db, "reviews"), {
+                    uid: user.uid,
+                    name: name || "AbuToys Customer",
+                    stars: stars || 5,
+                    text: text || "",
+                    createdAt: serverTimestamp()
+                });
+            },
+
+            async fetchReviews(max = 50) {
+                try {
+                    const q = query(collection(db, "reviews"), orderBy("createdAt", "desc"), limit(max));
+                    const snap = await getDocs(q);
+                    return snap.docs.map(d => d.data());
+                } catch (e) {
+                    console.warn("fetchReviews failed:", e);
+                    return [];
+                }
             }
         };
 
@@ -198,7 +234,7 @@
 <div id="abutoys-page-loader" class="abutoys-loader-container">
     <div class="loader-content">
         <div class="teddy-container">
-            <div class="teddy-emoji"><i class='fa-solid fa-shapes'></i></div>
+            <div class="teddy-emoji"><svg class="abutoys-smiley-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="#FFC43D" stroke="#E6961A" stroke-width="3"/><ellipse class="smiley-eye" cx="34" cy="42" rx="6" ry="8" fill="#2d2319"/><ellipse class="smiley-eye" cx="66" cy="42" rx="6" ry="8" fill="#2d2319"/><path d="M 28 58 Q 50 82 72 58" stroke="#2d2319" stroke-width="5" fill="none" stroke-linecap="round"/></svg></div>
         </div>
         <div class="abutoys-text">
             <span class="text-char">A</span>
@@ -217,7 +253,7 @@
     <nav class="navbar" id="navbar">
         <div class="nav-container">
             <div class="nav-logo">
-                <h2><i class='fa-solid fa-shapes'></i> AbuToys</h2>
+                <h2><svg class="abutoys-smiley-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="#FFC43D" stroke="#E6961A" stroke-width="3"/><ellipse class="smiley-eye" cx="34" cy="42" rx="6" ry="8" fill="#2d2319"/><ellipse class="smiley-eye" cx="66" cy="42" rx="6" ry="8" fill="#2d2319"/><path d="M 28 58 Q 50 82 72 58" stroke="#2d2319" stroke-width="5" fill="none" stroke-linecap="round"/></svg> AbuToys</h2>
             </div>
             <ul class="nav-menu" id="nav-menu">
                 <li><a href="index.html" class="nav-link active">Home</a></li>
@@ -375,9 +411,38 @@
             <button id="viewMoreTestimonials" class="btn btn-primary view-more-btn">
                 <i class='fa-solid fa-list-check'></i> View All Reviews (30+)
             </button>
+            <button id="giveReviewBtn" class="btn btn-secondary view-more-btn">
+                <i class='fa-solid fa-pen'></i> Give Review
+            </button>
         </div>
     </div>
 </section>
+
+<!-- Give Review Modal -->
+<div id="giveReviewModal" class="modal">
+    <span class="close" id="closeGiveReviewModalX">&times;</span>
+    <div class="modal-content" style="max-width:480px;">
+        <div class="modal-header">
+            <h2><i class='fa-solid fa-pen'></i> Share Your Experience</h2>
+            <p>Your review helps other parents trust us!</p>
+        </div>
+        <form id="giveReviewForm" style="padding: 0 30px 30px;">
+            <label class="profile-field-label">Your Rating</label>
+            <div id="giveReviewStars" class="give-review-stars">
+                <i class="fa-solid fa-star" data-star="1"></i>
+                <i class="fa-solid fa-star" data-star="2"></i>
+                <i class="fa-solid fa-star" data-star="3"></i>
+                <i class="fa-solid fa-star" data-star="4"></i>
+                <i class="fa-solid fa-star" data-star="5"></i>
+            </div>
+            <label class="profile-field-label" style="margin-top:14px;">Your Review</label>
+            <textarea id="giveReviewText" rows="4" placeholder="Tell us what you loved..." required style="width:100%; padding:12px; border-radius:12px; border:2px solid #e0e0e0; font-family:inherit; resize:vertical;"></textarea>
+            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:16px;">
+                <i class="fa-solid fa-paper-plane"></i> Submit Review
+            </button>
+        </form>
+    </div>
+</div>
 
 <!-- Testimonials Panel (Full Screen Sliding) -->
 <div id="testimonialsPanel" class="testimonials-panel">
@@ -697,7 +762,7 @@
         <div class="container">
             <div class="about-content">
                 <div class="about-text">
-                    <h2 class="section-title"><i class='fa-solid fa-shapes'></i> About AbuToys</h2>
+                    <h2 class="section-title"><svg class="abutoys-smiley-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="#FFC43D" stroke="#E6961A" stroke-width="3"/><ellipse class="smiley-eye" cx="34" cy="42" rx="6" ry="8" fill="#2d2319"/><ellipse class="smiley-eye" cx="66" cy="42" rx="6" ry="8" fill="#2d2319"/><path d="M 28 58 Q 50 82 72 58" stroke="#2d2319" stroke-width="5" fill="none" stroke-linecap="round"/></svg> About AbuToys</h2>
                     <p>Since 2024, we have been spreading happiness through toys in the beautiful city of Ahmedabad.
                         What started as a small family business has now become the most trusted toy store in the city.
                     </p>
@@ -797,7 +862,7 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-section">
-                    <h3><i class='fa-solid fa-shapes'></i> AbuToys</h3>
+                    <h3><svg class="abutoys-smiley-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="#FFC43D" stroke="#E6961A" stroke-width="3"/><ellipse class="smiley-eye" cx="34" cy="42" rx="6" ry="8" fill="#2d2319"/><ellipse class="smiley-eye" cx="66" cy="42" rx="6" ry="8" fill="#2d2319"/><path d="M 28 58 Q 50 82 72 58" stroke="#2d2319" stroke-width="5" fill="none" stroke-linecap="round"/></svg> AbuToys</h3>
                     <p>Making childhood magical since 2024</p>
                     <div class="social-icons">
                         <a href="https://wa.me/8160154042" target="_blank"><i class="fab fa-whatsapp"></i></a>
@@ -818,7 +883,7 @@
                     <h4>Contact Info</h4>
                     <div class="contact-info">
                         <p><i class="fas fa-phone"></i> +91 9879254030</p>
-                        <p><i class="fas fa-envelope"></i> AbuToys9879@gmail.com</p>
+                        <p><i class="fas fa-envelope"></i> abutoys9879@gmail.com</p>
                     </div>
                 </div>
             </div>
@@ -833,7 +898,7 @@
         <span class="close" id="closeAccountModalX">&times;</span>
         <div class="modal-content">
             <div class="modal-header">
-                <h2><i class='fa-solid fa-shapes'></i> Welcome to AbuToys</h2>
+                <h2><svg class="abutoys-smiley-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="#FFC43D" stroke="#E6961A" stroke-width="3"/><ellipse class="smiley-eye" cx="34" cy="42" rx="6" ry="8" fill="#2d2319"/><ellipse class="smiley-eye" cx="66" cy="42" rx="6" ry="8" fill="#2d2319"/><path d="M 28 58 Q 50 82 72 58" stroke="#2d2319" stroke-width="5" fill="none" stroke-linecap="round"/></svg> Welcome to AbuToys</h2>
                 <p>Join our happy family!</p>
             </div>
             <div class="modal-tabs">
@@ -853,38 +918,17 @@
                             style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer;"></i>
                     </div>
 
-                    <div class="auth-links-row">
+                    <div class="auth-links-row" style="justify-content:flex-end;">
                         <a href="#" id="forgotPasswordLink">Forgot password?</a>
-                        <a href="#" id="switchToPhoneLogin">Login with Phone</a>
                     </div>
 
                     <button type="submit" class="btn btn-primary" id="loginSubmitBtn" style="width:100%; justify-content:center;">Login</button>
                 </form>
 
-                <!-- PHONE OTP LOGIN (hidden by default) -->
-                <div id="phoneLoginBlock" style="display:none;">
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <span style="padding: 10px 12px; background:#f0f0f0; border-radius:8px;">+91</span>
-                        <input type="tel" id="loginPhone" placeholder="Phone Number (10 digits)" maxlength="10" style="flex:1;">
-                    </div>
-                    <button type="button" id="sendOtpBtn" class="btn btn-secondary" style="width:100%; justify-content:center; margin-top:8px;">Send OTP</button>
-
-                    <div id="otpInputBlock" style="display:none; margin-top:12px;">
-                        <input type="text" id="otpCode" placeholder="Enter 6-digit OTP" maxlength="6">
-                        <button type="button" id="verifyOtpBtn" class="btn btn-primary" style="width:100%; justify-content:center;">Verify OTP</button>
-                    </div>
-
-                    <div class="auth-links-row" style="justify-content:center; margin-top:10px;">
-                        <a href="#" id="switchToEmailLogin">← Login with Email instead</a>
-                    </div>
-                </div>
-
                 <div class="auth-divider"><span>OR</span></div>
                 <button type="button" id="googleLoginBtn" class="btn-google">
                     <i class="fa-brands fa-google"></i> Continue with Google
                 </button>
-
-                <div id="recaptcha-container"></div>
             </div>
 
             <!-- SIGNUP TAB -->
@@ -953,7 +997,10 @@
                     <input type="text" id="profileFullName" name="profileFullName" placeholder="Full Name">
 
                     <label class="profile-field-label">Email Address</label>
-                    <input type="email" id="profileEmail" name="profileEmail" placeholder="Email Address">
+                    <input type="email" id="profileEmail" name="profileEmail" placeholder="Email Address" disabled readonly>
+                    <p class="profile-google-note" style="display:block;">
+                        <i class="fa-solid fa-lock"></i> Email address can't be changed.
+                    </p>
 
                     <label class="profile-field-label">Phone Number</label>
                     <div style="display:flex; gap:8px; align-items:center;">
@@ -965,7 +1012,7 @@
                     <input type="text" id="profileAddress" name="profileAddress" placeholder="Full Address (House/Street/Locality)">
 
                     <p id="profileGoogleNote" class="profile-google-note" style="display:none;">
-                        <i class="fa-brands fa-google"></i> Signed in with Google — name & email are managed by your Google account.
+                        <i class="fa-brands fa-google"></i> Signed in with Google — your name is managed by your Google account.
                     </p>
 
                     <button type="submit" class="btn btn-primary" id="profileSaveBtn" style="width:100%; justify-content:center; margin-top:10px;">
