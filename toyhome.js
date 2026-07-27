@@ -715,11 +715,9 @@ class UserManager {
                 phone: userData.phone,
                 address: userData.address
             });
-            await this._syncFreshProfile();
 
-            closeAccountModal();
-            showPopup("<i class='fa-solid fa-circle-check'></i> Account created successfully! Welcome to AbuToys.", "success");
-            if (typeof updateFloatingButtons === "function") updateFloatingButtons();
+            if (typeof showTab === "function") showTab("login");
+            showPopup("<i class='fa-solid fa-envelope-circle-check'></i> Account created! We've sent a verification link to your email — please verify it, then log in.", "success");
             return true;
 
         } catch (error) {
@@ -764,35 +762,6 @@ class UserManager {
             if (error.code !== "auth/popup-closed-by-user") {
                 showPopup("<i class='fa-solid fa-circle-xmark'></i> " + this._friendlyAuthError(error), "error");
             }
-            return false;
-        }
-    }
-
-    async sendOtp(phone10digit) {
-        try {
-            if (!window.AbuFirebase) throw new Error("Firebase not ready");
-            const fullPhone = "+91" + phone10digit;
-            await window.AbuFirebase.sendOtp(fullPhone);
-            showPopup("<i class='fa-solid fa-circle-check'></i> OTP sent to " + fullPhone, "success");
-            return true;
-        } catch (error) {
- console.error(" OTP send error:", error);
-            showPopup("<i class='fa-solid fa-circle-xmark'></i> " + this._friendlyAuthError(error), "error");
-            return false;
-        }
-    }
-
-    async verifyOtp(code) {
-        try {
-            await window.AbuFirebase.verifyOtp(code);
-            await this._syncFreshProfile();
-            closeAccountModal();
-            showPopup("<i class='fa-solid fa-circle-check'></i> Phone verified! Welcome to AbuToys.", "success");
-            if (typeof updateFloatingButtons === "function") updateFloatingButtons();
-            return true;
-        } catch (error) {
- console.error(" OTP verify error:", error);
-            showPopup("<i class='fa-solid fa-circle-xmark'></i> " + this._friendlyAuthError(error), "error");
             return false;
         }
     }
@@ -844,7 +813,8 @@ class UserManager {
             "auth/invalid-credential": "Incorrect email or password.",
             "auth/too-many-requests": "Too many attempts. Try again later.",
             "auth/invalid-phone-number": "Invalid phone number.",
-            "auth/invalid-verification-code": "Incorrect OTP. Try again."
+            "auth/invalid-verification-code": "Incorrect OTP. Try again.",
+            "auth/email-not-verified": "Please verify your email first! We've just sent you a new verification link — check your inbox."
         };
         return map[code] || (error && error.message ? error.message : "Something went wrong. Try again.");
     }
@@ -985,7 +955,7 @@ function populateProfileModal() {
 
     const isGoogle = userManager.isGoogleAccount;
     if (fullNameInput) fullNameInput.disabled = isGoogle;
-    if (emailInput) emailInput.disabled = isGoogle;
+    if (emailInput) emailInput.disabled = true; // email can never be edited, for anyone
     if (googleNote) googleNote.style.display = isGoogle ? "block" : "none";
 
     renderProfileOrders();
@@ -1281,57 +1251,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const googleSignupBtn = document.getElementById("googleSignupBtn");
     if (googleSignupBtn) googleSignupBtn.addEventListener("click", () => userManager.loginWithGoogle());
-
- // ---- PHONE OTP LOGIN ----
-    const switchToPhoneLogin = document.getElementById("switchToPhoneLogin");
-    const switchToEmailLogin = document.getElementById("switchToEmailLogin");
-    const phoneLoginBlock = document.getElementById("phoneLoginBlock");
-    if (switchToPhoneLogin && phoneLoginBlock) {
-        switchToPhoneLogin.addEventListener("click", (e) => {
-            e.preventDefault();
-            loginForm.style.display = "none";
-            phoneLoginBlock.style.display = "block";
-        });
-    }
-    if (switchToEmailLogin && phoneLoginBlock) {
-        switchToEmailLogin.addEventListener("click", (e) => {
-            e.preventDefault();
-            phoneLoginBlock.style.display = "none";
-            loginForm.style.display = "block";
-        });
-    }
-
-    const loginPhoneInput = document.getElementById("loginPhone");
-    if (loginPhoneInput) {
-        loginPhoneInput.addEventListener("input", (e) => {
-            e.target.value = e.target.value.replace(/[^0-9]/g, "").slice(0, 10);
-        });
-    }
-
-    const sendOtpBtn = document.getElementById("sendOtpBtn");
-    if (sendOtpBtn) {
-        sendOtpBtn.addEventListener("click", async () => {
-            const phone = document.getElementById("loginPhone").value.trim();
-            if (phone.length !== 10) {
-                showPopup("<i class='fa-solid fa-circle-xmark'></i> Phone number must be 10 digits!", "error");
-                return;
-            }
-            const ok = await userManager.sendOtp(phone);
-            if (ok) document.getElementById("otpInputBlock").style.display = "block";
-        });
-    }
-
-    const verifyOtpBtn = document.getElementById("verifyOtpBtn");
-    if (verifyOtpBtn) {
-        verifyOtpBtn.addEventListener("click", async () => {
-            const code = document.getElementById("otpCode").value.trim();
-            if (code.length !== 6) {
-                showPopup("<i class='fa-solid fa-circle-xmark'></i> Enter the 6-digit OTP!", "error");
-                return;
-            }
-            await userManager.verifyOtp(code);
-        });
-    }
 });
 
 // =================== POPUP SYSTEM ===================
@@ -1629,7 +1548,7 @@ function createFloatingButtons() {
     whatsappFloat.innerHTML = `<i class="fab fa-whatsapp"></i>`;
     whatsappFloat.style.cssText = `
         position: fixed; 
-        bottom: 100px; 
+        bottom: 80px; 
         right: 20px;
         background: #25d366; 
         color: white; 
@@ -1680,7 +1599,7 @@ function createFloatingRegisterButton() {
     regFloat.innerHTML = `<i class="fas fa-user-plus"></i>`;
     regFloat.style.cssText = `
         position: fixed; 
-        bottom: 100px; 
+        bottom: 80px; 
         right: 20px;
         background: linear-gradient(45deg, #FF6B6B, #4ECDC4); 
         color: white; 
@@ -2254,20 +2173,24 @@ function openLocationPopup() {
     }
     else if (status === "in_range") {
         const charge = localStorage.getItem("abutoys_delivery_charge");
+        const distance = localStorage.getItem("abutoys_user_distance");
         html = `
             <h3 style="margin:0; font-size:18px; color:#2ecc71;"><i class='fa-solid fa-circle-check'></i> Location Verified</h3>
             <p style="margin:8px 0; font-size:15px;">
                 Delivery Available!<br>
+                ${distance ? `<b>Distance from shop: ${distance} km</b><br>` : ""}
                 <b>Delivery Charge: ₹${charge}</b>
             </p>
         `;
  // in_range me button nahi chahiye (already verified)
     }
     else if (status === "out_of_range") {
+        const distance = localStorage.getItem("abutoys_user_distance");
         html = `
             <h3 style="margin:0; font-size:18px; color:#e67e22;"><i class='fa-solid fa-triangle-exclamation'></i> Out of Range</h3>
             <p style="margin:8px 0; font-size:15px;">
-                Sorry! You are outside the 20km delivery area.<br>
+                Sorry! You are outside the delivery area.<br>
+                ${distance ? `<b>Distance from shop: ${distance} km</b><br>` : ""}
                 If you moved to a new location, tap below to re-check:
             </p>
         `;
@@ -2451,4 +2374,265 @@ window.addEventListener('load', () => {
     setTimeout(() => {
         initTestimonialsPanel();
     }, 500);
+});
+
+// =================== REVIEWS: RANDOM 3-ON-HOME + GIVE REVIEW + FIRESTORE ===================
+
+let dynamicReviews = []; // reviews fetched from Firestore, merged in quietly
+
+function getStaticReviewPool() {
+    const cards = document.querySelectorAll("#testimonialsPanel .panel-review");
+    const pool = [];
+    cards.forEach(card => {
+        const stars = card.querySelectorAll(".stars i").length;
+        const text = (card.querySelector(".review-text") || {}).textContent || "";
+        const name = ((card.querySelector(".reviewer-name") || {}).textContent || "").replace(/^-\s*/, "").trim();
+        if (text && name) pool.push({ stars, text, name });
+    });
+    return pool;
+}
+
+function fullReviewPool() {
+    return [...getStaticReviewPool(), ...dynamicReviews];
+}
+
+function starsHtml(count) {
+    let html = "";
+    for (let i = 0; i < 5; i++) {
+        html += `<i class="fa-solid fa-star" style="${i < count ? "" : "opacity:0.25;"}"></i>`;
+    }
+    return html;
+}
+
+function pickRandomReviews(pool, n) {
+    const copy = [...pool];
+    const picked = [];
+    while (copy.length && picked.length < n) {
+        const idx = Math.floor(Math.random() * copy.length);
+        picked.push(copy.splice(idx, 1)[0]);
+    }
+    return picked;
+}
+
+function renderHomeReviews() {
+    const grid = document.querySelector(".testimonials-grid");
+    if (!grid) return;
+    const pool = fullReviewPool();
+    if (!pool.length) return;
+    const chosen = pickRandomReviews(pool, Math.min(3, pool.length));
+
+    grid.innerHTML = chosen.map(r => `
+        <div class="testimonial-card scroll-animate visible">
+            <div class="stars">${starsHtml(r.stars)}</div>
+            <p>"${r.text.replace(/^"|"$/g, "")}"</p>
+            <div class="customer-info">
+                <strong>- ${r.name}</strong>
+            </div>
+        </div>
+    `).join("");
+}
+
+// Keep the home page reviews feeling alive — reshuffle every few seconds.
+function startHomeReviewRotation() {
+    renderHomeReviews();
+    setInterval(renderHomeReviews, 7000);
+}
+
+// Quietly fetch Firestore reviews in the background and merge them in.
+// This never disturbs whatever is already on screen — it just adds to the pool
+// so future rotations / the "View All Reviews" panel can include them.
+async function fetchAndMergeFirestoreReviews() {
+    if (!window.AbuFirebase || !window.AbuFirebase.fetchReviews) return;
+    try {
+        const reviews = await window.AbuFirebase.fetchReviews(50);
+        if (!reviews.length) return;
+        dynamicReviews = reviews.map(r => ({
+            stars: r.stars || 5,
+            text: r.text || "",
+            name: r.name || "AbuToys Customer"
+        }));
+
+        // Prepend the newest ones to the "View All Reviews" panel, above the
+        // existing static reviews, without touching what's already rendered.
+        const panelBody = document.querySelector("#testimonialsPanel .panel-body");
+        if (panelBody) {
+            const frag = document.createDocumentFragment();
+            dynamicReviews.forEach(r => {
+                const div = document.createElement("div");
+                div.className = "panel-review";
+                div.innerHTML = `
+                    <div class="review-header">
+                        <div class="stars">${starsHtml(r.stars)}</div>
+                    </div>
+                    <p class="review-text">"${r.text.replace(/^"|"$/g, "")}"</p>
+                    <div class="reviewer-name">- ${r.name}</div>
+                `;
+                frag.appendChild(div);
+            });
+            panelBody.insertBefore(frag, panelBody.firstChild);
+        }
+    } catch (e) {
+        console.warn("Could not load reviews from Firestore:", e);
+    }
+}
+
+function setupGiveReview() {
+    const giveBtn = document.getElementById("giveReviewBtn");
+    const modal = document.getElementById("giveReviewModal");
+    const closeX = document.getElementById("closeGiveReviewModalX");
+    const form = document.getElementById("giveReviewForm");
+    const starsWrap = document.getElementById("giveReviewStars");
+    let selectedStars = 0;
+
+    function openModal() {
+        if (!userManager.isLoggedIn()) {
+            showPopup("<i class='fa-solid fa-circle-info'></i> Please login first before giving review.", "warning");
+            return;
+        }
+        selectedStars = 0;
+        if (starsWrap) starsWrap.querySelectorAll("i").forEach(i => i.classList.remove("selected"));
+        if (form) form.reset();
+        if (modal) modal.style.display = "block";
+    }
+
+    function closeModal() {
+        if (modal) modal.style.display = "none";
+    }
+
+    if (giveBtn) giveBtn.addEventListener("click", openModal);
+    if (closeX) closeX.addEventListener("click", closeModal);
+    if (modal) {
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) closeModal();
+        });
+    }
+
+    if (starsWrap) {
+        starsWrap.querySelectorAll("i").forEach(star => {
+            star.addEventListener("click", () => {
+                selectedStars = parseInt(star.dataset.star, 10);
+                starsWrap.querySelectorAll("i").forEach(i => {
+                    i.classList.toggle("selected", parseInt(i.dataset.star, 10) <= selectedStars);
+                });
+            });
+        });
+    }
+
+    if (form) {
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            if (!userManager.isLoggedIn()) {
+                showPopup("<i class='fa-solid fa-circle-info'></i> Please login first before giving review.", "warning");
+                closeModal();
+                return;
+            }
+            const text = document.getElementById("giveReviewText").value.trim();
+            if (!selectedStars) {
+                showPopup("<i class='fa-solid fa-circle-xmark'></i> Please select a star rating!", "error");
+                return;
+            }
+            if (!text) {
+                showPopup("<i class='fa-solid fa-circle-xmark'></i> Please write your review!", "error");
+                return;
+            }
+            try {
+                const name = (userManager.profile && userManager.profile.fullName) || "AbuToys Customer";
+                await window.AbuFirebase.submitReview({ name, stars: selectedStars, text });
+                dynamicReviews.unshift({ stars: selectedStars, text, name });
+                closeModal();
+                showPopup("<i class='fa-solid fa-circle-check'></i> Thank you! Your review has been submitted.", "success");
+            } catch (err) {
+                console.error("Submit review error:", err);
+                showPopup("<i class='fa-solid fa-circle-xmark'></i> Could not submit review, try again.", "error");
+            }
+        });
+    }
+}
+
+window.addEventListener("load", () => {
+    setTimeout(() => {
+        startHomeReviewRotation();
+        setupGiveReview();
+    }, 600);
+
+    const kickOffReviewFetch = () => fetchAndMergeFirestoreReviews();
+    if (window.AbuFirebase) {
+        kickOffReviewFetch();
+    } else {
+        window.addEventListener("abufirebase-ready", kickOffReviewFetch, { once: true });
+    }
+});
+
+// =================== LOCATION: ADDRESS AUTO-SUGGEST FROM SAVED LOCATION ===================
+// After a successful GPS verification we reverse-geocode the coordinates once
+// (via OpenStreetMap Nominatim) and cache a human-readable address string, so
+// the address inputs (signup + profile) can offer it as a one-tap suggestion.
+
+async function reverseGeocodeAndCache(lat, lng) {
+    try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`, {
+            headers: { "Accept": "application/json" }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.display_name) {
+            localStorage.setItem("abutoys_location_address", data.display_name);
+        }
+    } catch (e) {
+        console.warn("Reverse geocode failed:", e);
+    }
+}
+
+// Piggyback on the existing success handler so this runs automatically
+// every time a location gets verified, without changing its return value.
+if (typeof handlePositionSuccess === "function" && !window._abutoysGeocodeWrapped) {
+    window._abutoysGeocodeWrapped = true;
+    const _origHandlePositionSuccess = handlePositionSuccess;
+    handlePositionSuccess = async function (coords) {
+        const result = await _origHandlePositionSuccess(coords);
+        reverseGeocodeAndCache(coords.latitude, coords.longitude);
+        return result;
+    };
+}
+
+function attachLocationSuggestion(input) {
+    if (!input) return;
+    let box = null;
+
+    const removeBox = () => {
+        if (box) { box.remove(); box = null; }
+    };
+
+    input.addEventListener("focus", () => {
+        const saved = localStorage.getItem("abutoys_location_address");
+        if (!saved) return;
+        removeBox();
+        box = document.createElement("div");
+        box.className = "location-suggest-box";
+        box.innerHTML = `<small><i class="fa-solid fa-location-dot"></i> Use your verified location</small>${saved}`;
+
+        const rect = input.getBoundingClientRect();
+        box.style.left = (rect.left + window.scrollX) + "px";
+        box.style.top = (rect.bottom + window.scrollY + 6) + "px";
+        box.style.width = Math.max(rect.width, 240) + "px";
+
+        box.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            input.value = saved;
+            removeBox();
+        });
+
+        document.body.appendChild(box);
+    });
+
+    input.addEventListener("blur", () => {
+        setTimeout(removeBox, 150);
+    });
+}
+
+window.addEventListener("load", () => {
+    setTimeout(() => {
+        attachLocationSuggestion(document.getElementById("address"));
+        attachLocationSuggestion(document.getElementById("profileAddress"));
+    }, 800);
 });
