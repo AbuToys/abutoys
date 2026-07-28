@@ -58,13 +58,13 @@
         position: absolute;
         bottom: -80px;
         border-radius: 50%;
-        background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9), rgba(255,255,255,0.12) 70%);
-        border: 1px solid rgba(255,255,255,0.45);
-        box-shadow: 0 0 12px rgba(255,255,255,0.25) inset;
+        background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.95), rgba(255,107,107,0.55) 70%);
+        border: 1px solid #FF6B6B;
+        box-shadow: 0 0 12px rgba(255,107,107,0.55) inset;
         pointer-events: auto;
         cursor: pointer;
         animation-name: loaderBubbleRise;
-        animation-timing-function: ease-in;
+        animation-timing-function: ease-out;
         animation-iteration-count: infinite;
         will-change: transform, opacity;
     }
