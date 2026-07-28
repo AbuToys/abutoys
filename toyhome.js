@@ -1,6 +1,6 @@
 // =================== LOADER BUBBLES ===================
-function spawnLoaderBubbles() {
-    const wrap = document.getElementById("loaderBubbles");
+function spawnLoaderBubbles(targetId = "loaderBubbles") {
+    const wrap = document.getElementById(targetId);
     if (!wrap) return;
     wrap.innerHTML = "";
 
@@ -56,7 +56,6 @@ function hidePageLoadLoader() {
 function initializeLoader() {
     if (!hasLoaderBeenShown()) {
         markLoaderAsShown();
-        spawnLoaderBubbles();
 
  // Show loader for 1 second
         setTimeout(() => {
@@ -93,7 +92,8 @@ function showLocationLoader() {
     `;
 
     wrap.innerHTML = `
-        <div style="text-align:center;">
+        <div class="loader-bubbles" id="locationLoaderBubbles"></div>
+        <div style="text-align:center; position:relative; z-index:2;">
             <div style="
                 border: 6px solid #fff;
                 border-top: 6px solid #4ECDC4;
@@ -110,6 +110,7 @@ function showLocationLoader() {
     `;
 
     document.body.appendChild(wrap);
+    spawnLoaderBubbles("locationLoaderBubbles");
 }
 
 function hideLocationLoader() {
