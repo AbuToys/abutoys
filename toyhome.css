@@ -78,23 +78,27 @@
         filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.15));
     }
 
-    /* =================== ABUTOYS SMILEY BRAND ICON =================== */
-    .abutoys-smiley-icon {
+    /* =================== ABUTOYS PINWHEEL BRAND ICON =================== */
+    .abutoys-brand-icon {
         width: 1em;
         height: 1em;
         vertical-align: -0.15em;
         display: inline-block;
     }
 
-    .abutoys-smiley-icon .smiley-eye {
-        animation: smileyBlink 2s ease-in-out infinite;
-        transform-origin: center;
-        transform-box: fill-box;
+    /* Spins everywhere the brand icon appears — navbar, footer, loader, modals. */
+    .abutoys-brand-icon .abu-pinwheel {
+        transform-origin: 50px 50px;
+        animation: abuPinwheelSpin 3s linear infinite;
     }
 
-    @keyframes smileyBlink {
-        0%, 92%, 100% { transform: scaleY(1); }
-        96% { transform: scaleY(0.12); }
+    @keyframes abuPinwheelSpin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .teddy-emoji .abutoys-brand-icon {
+        filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.15));
     }
 
     /* AbuToys Text Animation */
@@ -845,6 +849,19 @@
         display: flex;
         align-items: center;
         gap: 10px;
+    }
+
+    .contact-info a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: inherit;
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+
+    .contact-info a:hover {
+        color: #4ECDC4;
     }
 
     .contact-info i {
