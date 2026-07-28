@@ -1,3 +1,31 @@
+// =================== BUBBLE POP SOUND ===================
+let _bubbleAudioCtx = null;
+function playBubblePopSound() {
+    try {
+        if (!_bubbleAudioCtx) {
+            _bubbleAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const ctx = _bubbleAudioCtx;
+        if (ctx.state === "suspended") ctx.resume();
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(650, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + 0.14);
+
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.18);
+    } catch (e) {
+        console.warn("pop sound failed", e);
+    }
+}
+
 // =================== LOADER BUBBLES ===================
 function spawnLoaderBubbles(targetId = "loaderBubbles") {
     const wrap = document.getElementById(targetId);
@@ -11,7 +39,7 @@ function spawnLoaderBubbles(targetId = "loaderBubbles") {
 
         const size = Math.round(18 + Math.random() * 55); // 18px - 73px (small + big mix)
         const left = Math.random() * 100; // vw %
-        const duration = (3.5 + Math.random() * 2.5).toFixed(2); // 3.5s - 6s
+        const duration = (7 + Math.random() * 3).toFixed(2); // 7s - 10s (slower, more time to pop)
         const delay = (Math.random() * 1.2).toFixed(2); // start almost immediately
         const drift = Math.round((Math.random() - 0.5) * 140); // -70px to 70px sideways drift
 
@@ -25,6 +53,7 @@ function spawnLoaderBubbles(targetId = "loaderBubbles") {
         bubble.addEventListener("click", () => {
             if (bubble.classList.contains("popped")) return;
             bubble.classList.add("popped");
+            playBubblePopSound();
             setTimeout(() => bubble.remove(), 260);
         });
 
