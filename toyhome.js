@@ -2636,3 +2636,21 @@ window.addEventListener("load", () => {
         attachLocationSuggestion(document.getElementById("profileAddress"));
     }, 800);
 });
+
+// =================== FOOTER "CALL NOW" — DESKTOP GUARD ===================
+// tel: links do nothing useful on a computer/laptop, so on non-mobile devices
+// we show a friendly message instead of letting the browser try (and fail) to dial.
+function isMobileDevice() {
+    return /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent);
+}
+
+document.querySelectorAll('a[href^="tel:"]').forEach(link => {
+    link.addEventListener("click", (e) => {
+        if (!isMobileDevice()) {
+            e.preventDefault();
+            showPopup("<i class='fa-solid fa-mobile-screen-button'></i> For calling, please use your mobile.", "info");
+        }
+        // On an actual mobile device, let the browser open the dialer normally
+        // (the number is already prefilled via the tel: href).
+    });
+});
