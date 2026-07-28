@@ -1,3 +1,37 @@
+// =================== LOADER BUBBLES ===================
+function spawnLoaderBubbles() {
+    const wrap = document.getElementById("loaderBubbles");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+
+    const count = 16;
+    for (let i = 0; i < count; i++) {
+        const bubble = document.createElement("div");
+        bubble.className = "loader-bubble";
+
+        const size = Math.round(18 + Math.random() * 55); // 18px - 73px (small + big mix)
+        const left = Math.random() * 100; // vw %
+        const duration = (3.5 + Math.random() * 2.5).toFixed(2); // 3.5s - 6s
+        const delay = (Math.random() * 1.2).toFixed(2); // start almost immediately
+        const drift = Math.round((Math.random() - 0.5) * 140); // -70px to 70px sideways drift
+
+        bubble.style.width = size + "px";
+        bubble.style.height = size + "px";
+        bubble.style.left = left + "%";
+        bubble.style.animationDuration = duration + "s";
+        bubble.style.animationDelay = delay + "s";
+        bubble.style.setProperty("--bubble-drift", drift + "px");
+
+        bubble.addEventListener("click", () => {
+            if (bubble.classList.contains("popped")) return;
+            bubble.classList.add("popped");
+            setTimeout(() => bubble.remove(), 260);
+        });
+
+        wrap.appendChild(bubble);
+    }
+}
+
 // =================== PAGE LOAD LOADER ===================
 
 function hasLoaderBeenShown() {
@@ -22,7 +56,8 @@ function hidePageLoadLoader() {
 function initializeLoader() {
     if (!hasLoaderBeenShown()) {
         markLoaderAsShown();
-        
+        spawnLoaderBubbles();
+
  // Show loader for 1 second
         setTimeout(() => {
             hidePageLoadLoader();
@@ -1850,7 +1885,8 @@ function showDeleteAccountOverlay() {
 }
 
 async function deleteUserAccount(overlay) {
- // Actual Firebase account delete (Auth + Firestore profile)
+ // Actual Firebase account delete (Auth + Firestore profile) — this happens
+ // instantly, so there's no need for any waiting period afterwards.
     const ok = await userManager.deleteAccount();
 
     if (!ok) {
@@ -1866,186 +1902,15 @@ async function deleteUserAccount(overlay) {
         localStorage.removeItem("abutoys_location_status");
         localStorage.removeItem("abutoys_delivery_charge");
         localStorage.removeItem("abutoys_user_distance");
+        localStorage.removeItem("abutoys_location_address");
     } catch (e) {
  console.log("Error clearing local cache:", e);
     }
 
- // Set deletion flag with timestamp
-    const deletionTime = Date.now();
-    try {
-        localStorage.setItem("abutoys_account_deleted", "true");
-        localStorage.setItem("abutoys_deletion_timestamp", deletionTime.toString());
-    } catch (e) {
- console.log("Error setting deletion flag:", e);
-    }
-
- // Close pehla overlay
+ // Close the confirmation overlay
     overlay.remove();
 
- // Show 30-minute overlay
-    showPostDeletionOverlay();
-}
-
-function showPostDeletionOverlay() {
-    const overlay = document.createElement('div');
-    overlay.id = 'post-deletion-overlay';
-    overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10006;
-        padding: 20px;
-    `;
-
-    overlay.innerHTML = `
-        <div style="
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            max-width: 450px;
-            width: 100%;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-            animation: slideUp 0.4s ease-out;
-        ">
-            <div style="font-size: 3.5rem; margin-bottom: 20px;"><i class='fa-solid fa-circle-check'></i></div>
-            
-            <h2 style="
-                color: #333;
-                font-size: 1.8rem;
-                margin-bottom: 15px;
-                font-family: 'Fredoka One', cursive;
-            ">Account Deleted Successfully</h2>
-            
-            <p style="
-                color: #666;
-                font-size: 1rem;
-                line-height: 1.6;
-                margin-bottom: 15px;
-            ">
-                Your account has been deleted from our system.
-            </p>
-
-            <p style="
-                color: #FF6B6B;
-                font-size: 1.1rem;
-                font-weight: 700;
-                margin-bottom: 20px;
-            ">
-                <i class="fa-solid fa-hourglass-half"></i> You can create a new account after:
-            </p>
-
-            <div id="timerDisplay" style="
-                background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
-                color: white;
-                padding: 20px;
-                border-radius: 15px;
-                font-size: 2rem;
-                font-weight: 800;
-                margin-bottom: 25px;
-                font-family: 'Courier New', monospace;
-                letter-spacing: 2px;
-            ">
-                30:00:00
-            </div>
-
-            <p style="
-                color: #999;
-                font-size: 0.9rem;
-                margin-bottom: 20px;
-            ">
-                (Hours : Minutes : Seconds)
-            </p>
-
-            <button onclick="window.location.href='index.html'" style="
-                padding: 12px 30px;
-                background: #4ECDC4;
-                color: white;
-                border: none;
-                border-radius: 25px;
-                cursor: pointer;
-                font-weight: 600;
-                font-size: 1rem;
-                transition: all 0.3s ease;
-            ">
-                <i class='fa-solid fa-house'></i> Go to Home
-            </button>
-        </div>
-    `;
-
-    document.body.appendChild(overlay);
-
- // Start timer
-    startDeletionTimer(overlay);
-}
-
-function startDeletionTimer(overlay) {
-    const deletionTimestamp = parseInt(localStorage.getItem("abutoys_deletion_timestamp") || "0");
-    const THIRTY_MINUTES = 30 * 60 * 1000; // 30 minutes in milliseconds
-
-    function updateTimer() {
-        const now = Date.now();
-        const timePassed = now - deletionTimestamp;
-        const timeRemaining = THIRTY_MINUTES - timePassed;
-
-        if (timeRemaining <= 0) {
- // Timer complete - remove overlay aur flag
-            try {
-                localStorage.removeItem("abutoys_account_deleted");
-                localStorage.removeItem("abutoys_deletion_timestamp");
-            } catch (e) { }
-
-            overlay.remove();
-            showPopup("<i class='fa-solid fa-circle-check'></i> You can now create a new account!", "success");
-            return;
-        }
-
- // Calculate hours, minutes, seconds
-        const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
-        const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
-
- // Format with leading zeros
-        const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-
-        const timerDisplay = document.getElementById('timerDisplay');
-        if (timerDisplay) {
-            timerDisplay.textContent = formattedTime;
-        }
-
- // Update har second
-        setTimeout(updateTimer, 1000);
-    }
-
- // Start immediately
-    updateTimer();
-}
-
-// Check on page load agar deletion active hai
-function checkIfAccountDeleted() {
-    const isDeleted = localStorage.getItem("abutoys_account_deleted");
-
-    if (isDeleted === "true") {
-        const deletionTimestamp = parseInt(localStorage.getItem("abutoys_deletion_timestamp") || "0");
-        const THIRTY_MINUTES = 30 * 60 * 1000;
-        const now = Date.now();
-        const timePassed = now - deletionTimestamp;
-
-        if (timePassed < THIRTY_MINUTES) {
- // Still within 30 minutes - show overlay
-            showPostDeletionOverlay();
-        } else {
- // 30 minutes over - clear flags
-            localStorage.removeItem("abutoys_account_deleted");
-            localStorage.removeItem("abutoys_deletion_timestamp");
-        }
-    }
+    showPopup("<i class='fa-solid fa-circle-check'></i> Your account was deleted from server.", "success");
 }
 
 // Add CSS animation
@@ -2077,7 +1942,6 @@ function addDeleteAccountStyles() {
 // Call in DOMContentLoaded
 document.addEventListener("DOMContentLoaded", () => {
     addDeleteAccountStyles();
-    checkIfAccountDeleted();
 });
 
 // Allow using product page order history from home page
